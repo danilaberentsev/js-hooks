@@ -1,25 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 export function useTimer(sec, initImmediately) {
   const [remaining, setRemaining] = useState(sec);
   const timerRef = useRef(null);
 
-  const initTimer = (passedSec) => {
+  const initTimer = useCallback((passedSec) => {
     setRemaining(passedSec || sec);
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setRemaining(prev => prev - 1);
     }, 1000);
-  };
+  }, [sec]);
 
   useEffect(() => {
     if (initImmediately) initTimer();
 
     return () => clearInterval(timerRef.current);
-  }, []);
+  }, [initImmediately, initTimer]);
 
   useEffect(() => {
-    if (!remaining || remaining <= 0) {
+    if (remaining < 1) {
       clearInterval(timerRef.current);
     }
   }, [remaining]);

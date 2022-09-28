@@ -3,6 +3,7 @@ import { useCallback, useRef } from 'react';
 // prefer to use real ids in checkbox lists
 const generateMostlyUniqueId = () => performance.now().toString(36) + Math.random().toString(36).slice(2);
 
+// possible values Y/N, 1/0, true/false
 export function useCheckbox({ id, valueType, onChange, name, value }) {
   const idRef = useRef(id || generateMostlyUniqueId());
 

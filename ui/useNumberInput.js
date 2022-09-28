@@ -1,5 +1,5 @@
 export function useNumberInput({ onChange, onBlur, hasDecimals, disabled, onClick }) {
-  const numberFormat = val => (
+  const formatNumber = val => (
     hasDecimals
       ? +val.replace(/,/g, '.')
       : +val.replace(/\D/g, '')
@@ -16,12 +16,12 @@ export function useNumberInput({ onChange, onBlur, hasDecimals, disabled, onClic
 
   const handleChange = (e) => {
     if (e.target.value < 0 || disabled) return;
-    onChange(numberFormat(e.target.value));
+    onChange(formatNumber(e.target.value));
   };
 
   const handleBlur = (e) => {
-    if (e.target.value < 0 || disabled || !onBlur) return;
-    onBlur(numberFormat(e.target.value));
+    if (e.target.value < 0 || disabled) return;
+    onBlur(formatNumber(e.target.value));
   };
 
   return {

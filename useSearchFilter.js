@@ -9,10 +9,10 @@ export function useSearchFilter({ data, key = 'name' }) {
     return valueFormatted.indexOf(searchFormatted) >= 0;
   }) : data;
 
-  function clear(e) {
+  const clear = (e) => {
     if (e) e.preventDefault();
     setSearch('');
-  }
+  };
 
   return [search, setSearch, filteredData, clear];
 }

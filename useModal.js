@@ -1,26 +1,12 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
-export function useModal({ stopPropagation } = {}) {
-  const [show, setShow] = useState(false);
+export function useModal({ initialState = false } = {}) {
+  const [isShown, setIsShown] = useState(initialState);
 
-  function open(e, data) {
-    if (e && e.preventDefault) e.preventDefault();
-    if (e && stopPropagation && e.stopPropagation) e.stopPropagation();
-
-    let result = true;
-    if (data) result = data;
-    else if (e && e.currentTarget.dataset.id) result = e.currentTarget.dataset.id;
-    else if (e && !e.target) result = e;
-
-    setShow(result);
-  }
-
-  function close(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    if (e && stopPropagation && e.stopPropagation) e.stopPropagation();
-
-    setShow(false);
-  }
-
-  return [show, open, close];
+  return {
+    isShown,
+    show: useCallback((data) => setIsShown(data || true), []),
+    hide: useCallback(() => setIsShown(false), []),
+    toggle: useCallback(() => setIsShown((prev) => !prev), [])
+  };
 }

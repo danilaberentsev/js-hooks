@@ -1,155 +1,67 @@
-/* global localStorage $ */
-import React, { useCallback, useLayoutEffect, useState } from 'react';
-import { useHistory, useLocation, useParams } from 'react-router';
-import removeEmptyValues from 'dealer365-utils/removeEmptyValues';
-import { parseQry, stringifyQry } from 'dealer365-utils/query';
-import { useEffectOnUpdate } from './useEffectOnUpdate';
+import { useEffect, useReducer, useRef, useCallback } from 'react';
 
-export function useListLoader(props) {
-  const {
-    request, // запрос на список
-    optionsRequest, // запрос на опции, делается один раз при маунте
-    initialLoad = true, // делать запрос при маунте
-    useRouter = true, // сохранять изменения в url
-    hidden = [], // ключи параметров скрытых из url
-    settingsToSave = [], // ключи параметров сохраняемых в localStorage
-    passedDefaultParams = {}, // дефолтные параметры для каждого запроса
-    passedInitialParams = {}, // параметры для первого запроса
-  } = props;
+const modes = {
+  request: 'request',
+  requestMore: 'requestMore',
+  refresh: 'refresh',
+  rewrite: 'rewrite',
+};
 
-  const defaultParams = {
-    filter: {},
+// request callback should be memoized
+export function useListLoader({ total, extParams, request, initialLoad = true }) {
+  const defaultState = {
+    page: 1,
+    perPage: 20,
     sort: '',
     sort_by: '',
-    per_page: '20',
-    page: 1,
-    ...passedDefaultParams,
+    mode: modes.request,
+    ...extParams
   };
 
-  const history = useHistory();
-  const location = useLocation();
-  const match = useParams();
-
-  const queryObject = useRouter ? parseQry(location.search) : {};
-
-  const getSettings = () => {
-    const settings = {};
-    settingsToSave.forEach((key) => { settings[key] = localStorage.getItem(key); });
-    return settings;
-  };
-
-  const setSetting = (key, value) => {
-    if (settingsToSave.indexOf(key) >= 0) {
-      localStorage.setItem(key, value);
+  const paramsReducer = (state, { mode, data }) => {
+    switch (mode) {
+      case modes.requestMore: return { ...state, page: state.page + 1, mode };
+      case modes.refresh: return { ...state, page: 1, mode };
+      case modes.request: return { ...state, ...data, mode };
+      case modes.rewrite: return { ...defaultState, ...data, mode: 'request' };
+      default: return state;
     }
   };
 
-  const initialQueryParamsState = {
-    ...defaultParams,
-    ...passedInitialParams,
-    ...getSettings(),
-    ...queryObject,
-    page: useRouter ? match.page : ''
-  };
+  const [params, dispatch] = useReducer(paramsReducer, defaultState);
+  const shouldLoad = useRef(initialLoad);
+  const canLoadMore = total > params.page * params.perPage;
 
-  const [params, setParams] = useState(initialQueryParamsState);
-  const [lastRequestQuery, setLastRequestQuery] = useState('');
-  const [initLoadData, setInitLoadData] = useState(initialLoad);
-
-  const submit = (e, passedParams, info = true) => {
-    if (e) e.preventDefault();
-    setParams(prevState => ({ ...prevState, page: '', ...passedParams }));
-    setInitLoadData(info);
-  };
-
-  const refresh = useCallback(() => {
-    setInitLoadData(true);
-  }, []);
-
-  const setFilter = (e, data = { [e.target.name]: e.target.value }, submitImmediately) => {
-    setParams(prevState => ({ ...prevState, filter: { ...prevState.filter, ...data } }));
-    if (submitImmediately) submit();
-  };
-
-  const setPerPage = (perPage) => {
-    setSetting('per_page', perPage);
-    submit(null, { per_page: perPage });
-  };
-
-  const setPage = (e, page) => {
-    submit(e, { page });
-  };
-
-  const setSort = (e, sort) => submit(e, { ...sort });
-
-  const resetQueryParams = (e, submitImmediately) => {
-    if (e) e.preventDefault();
-    setParams(defaultParams);
-    if (submitImmediately) setInitLoadData(true);
-  };
-
-  const getCurrentParamsQuery = () => stringifyQry(removeEmptyValues(params));
-
-  const getRouterSearch = (passedParams) => {
-    const newSearchObj = {};
-    Object.entries(passedParams).forEach(([key, value]) => {
-      if (value && !hidden.includes(key) && value !== defaultParams[key]) {
-        newSearchObj[key] = value;
-      }
-    });
-
-    return stringifyQry(newSearchObj);
-  };
-
-  const loadData = (info) => {
-    const { page, ...restParams } = params;
-
-    if (useRouter) {
-      const pageUrl = page > 1 ? `/page/${page}` : '';
-      const rootUrl = location.pathname.replace(`/page/${match.page}`, '');
-      const search = getRouterSearch(restParams);
-      const lastUrl = `${location.pathname}${location.search}`;
-      const nextUrl = `${rootUrl}${pageUrl}${search ? `?${search}` : ''}`;
-      if (lastUrl !== nextUrl) history.push(nextUrl);
+  useEffect(() => {
+    if (shouldLoad.current) {
+      const { mode, page, perPage, sort_by: sortBy, sort, ...filter } = params;
+      request(mode, removeEmptyValues({ page, per_page: perPage, sort, sort_by: sortBy, filter }));
+    } else {
+      shouldLoad.current = true;
     }
-
-    const query = getCurrentParamsQuery();
-    setLastRequestQuery(query);
-    request({ query, info });
-  };
-
-  useLayoutEffect(() => {
-    if (initLoadData) {
-      loadData(initLoadData);
-      setInitLoadData(false);
-    }
-  }, [initLoadData]);
-
-  useLayoutEffect(() => {
-    if (optionsRequest) {
-      optionsRequest();
-    }
-  }, []);
-
-  useEffectOnUpdate(() => {
-    if (useRouter) {
-      submit(null, { ...defaultParams, ...queryObject, page: match.page });
-    }
-  }, [location.search, match.page]);
+  }, [request, params]);
 
   return {
-    setFilter,
-    resetQueryParams,
-    getCurrentParamsQuery,
-    setPerPage,
-    setSort,
-    setPage,
-    submit,
-    refresh,
-    setQueryParams: setParams,
-    perPage: params.per_page,
-    ...params,
-    sort: { sort: params.sort, sort_by: params.sort_by },
-    lastRequestQuery
+    params,
+    refresh: useCallback(() => dispatch({ mode: modes.refresh }), []),
+    loadMore: useCallback(() => { if (canLoadMore) dispatch({ mode: modes.requestMore }); }, [canLoadMore]),
+    updateParams: useCallback((data) => dispatch({ mode: modes.request, data }), []),
+    updateWithReset: useCallback((data) => dispatch({ mode: modes.request, data: { ...data, page: 1 } }), []),
+    filterRewrite: useCallback((data) => dispatch({ mode: modes.rewrite, data }), [])
   };
+}
+
+
+function removeEmptyValues(obj) {
+  const newObj = { ...obj };
+
+  Object.keys(newObj).forEach((key) => {
+    if (!newObj[key]) {
+      delete newObj[key];
+    } else if (typeof newObj[key] === 'object' && !Array.isArray(newObj[key])) {
+      newObj[key] = removeEmptyValues(newObj[key]);
+    }
+  });
+
+  return newObj;
 }

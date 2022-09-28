@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useOnClickOutside, useDebounce } from 'dealer365-hooks';
+import { useEffect } from 'react';
+import { useOnClickOutside, useDebounce } from '../../index';
 import { useAutocompleteState } from './useAutocompleteState';
 
 export function useAutocomplete({

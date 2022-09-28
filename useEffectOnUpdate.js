@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 
-export const useEffectOnUpdate = (callback, deps) => {
+export function useEffectOnUpdate(callback) {
   const mounted = useRef();
 
   useEffect(() => {
@@ -9,5 +9,5 @@ export const useEffectOnUpdate = (callback, deps) => {
     } else {
       callback();
     }
-  }, deps);
-};
+  }, [callback]);
+}
